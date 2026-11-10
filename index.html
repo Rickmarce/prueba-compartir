@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prueba compartir</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#b45309">
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 16px; background: #fff7ed; color: #1c1917; }
+  h1 { font-size: 1.3rem; margin: 0 0 12px; }
+  h2 { font-size: 1.05rem; margin: 22px 0 8px; border-top: 2px solid #b45309; padding-top: 12px; }
+  .caja { background: #fff; border: 1px solid #d6d3d1; border-radius: 10px; padding: 12px; margin-bottom: 8px; word-break: break-all; }
+  .si { color: #15803d; font-weight: 700; } .no { color: #b91c1c; font-weight: 700; }
+  a.btn, button { display: block; width: 100%; box-sizing: border-box; padding: 14px; margin: 8px 0; border: 0; border-radius: 10px;
+    background: #b45309; color: #fff; font-size: 1rem; text-align: center; text-decoration: none; }
+  small { color: #57534e; }
+  ul { padding-left: 18px; margin: 6px 0; }
+</style>
+</head>
+<body>
+<h1>Prueba compartir <small id="ver"></small></h1>
+
+<h2>1 · Estado de esta instalación</h2>
+<div class="caja" id="estado">cargando…</div>
+<small>Pega la captura de esta pantalla antes y después de «Actualizar» en <b>chrome://webapks</b>.</small>
+
+<h2>2 · Datos conservados</h2>
+<div class="caja">Contador de aperturas: <b id="aperturas">?</b><br>
+<small>Si tras actualizar sigue subiendo (no vuelve a 1), la actualización conserva los datos.</small></div>
+
+<h2>3 · Fotos recibidas por Compartir</h2>
+<div class="caja" id="compartidas">ninguna todavía</div>
+<small>Prueba con UNA foto y luego con VARIAS a la vez (WhatsApp → mantener pulsada → ⋮ → Compartir → Prueba).</small>
+<button id="borrar">Borrar la lista</button>
+
+<h2>4 · Qué abre «Galería»</h2>
+<button id="galeria">🖼️ Galería (selector de fotos)</button>
+<div class="caja" id="elegidas">sin elegir</div>
+<small>Anota: ¿sale el selector de Android o Google Fotos? ¿Salen primero las de WhatsApp?</small>
+<input type="file" id="in-galeria" accept="image/*" multiple hidden>
+
+<h2>5 · Abrir WhatsApp desde un botón</h2>
+<small>Pulsa cada uno y anota qué pasa (abre WhatsApp en la lista de chats / abre un chat nuevo / error / pregunta con qué abrir).</small>
+<a class="btn" href="https://wa.me/">A · https://wa.me/</a>
+<a class="btn" href="whatsapp://">B · whatsapp://</a>
+<a class="btn" href="intent://#Intent;package=com.whatsapp;scheme=whatsapp;end">C · intent WhatsApp</a>
+<a class="btn" href="intent://#Intent;package=com.whatsapp.w4b;scheme=whatsapp;end">D · intent WhatsApp Business</a>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const instalada = matchMedia('(display-mode: standalone)').matches;
+const si = (t) => `<span class="si">${t}</span>`, no = (t) => `<span class="no">${t}</span>`;
+
+$('estado').innerHTML = [
+  `Dirección: <b>${location.pathname}${location.search}</b>`,
+  `Abierta como app instalada: ${instalada ? si('SÍ') : no('NO (navegador)')}`,
+  `Arrancó con la marca ?i=2: ${params.get('i') === '2' ? si('SÍ') : no('NO')}`,
+  `Service worker controlando: ${navigator.serviceWorker && navigator.serviceWorker.controller ? si('SÍ') : no('NO')}`,
+  `Manifest: <b id="mid">…</b>`,
+].map((x) => `<div>${x}</div>`).join('');
+
+fetch('manifest.webmanifest', { cache: 'no-store' }).then((r) => r.json()).then((m) => {
+  $('mid').textContent = `id=${m.id || '(sin id)'} · start_url=${m.start_url}`;
+  $('ver').textContent = m.id ? '· manifest v2' : '· manifest v1';
+}).catch(() => { $('mid').textContent = 'no se pudo leer'; });
+
+try {
+  const n = (Number(localStorage.getItem('aperturas')) || 0) + 1;
+  localStorage.setItem('aperturas', n);
+  $('aperturas').textContent = n;
+} catch (e) { $('aperturas').textContent = 'sin almacenamiento'; }
+
+async function pintarCompartidas() {
+  const c = await caches.open('prueba-compartidas');
+  const r = await c.match('lista');
+  const lista = r ? await r.json() : [];
+  $('compartidas').innerHTML = lista.length
+    ? `<b>${lista.length} foto(s)</b><ul>${lista.map((f) => `<li>${f.hora} · ${f.nombre} · ${f.kb} KB</li>`).join('')}</ul>`
+    : 'ninguna todavía';
+}
+$('borrar').onclick = async () => { await caches.delete('prueba-compartidas'); pintarCompartidas(); };
+pintarCompartidas();
+
+$('galeria').onclick = () => $('in-galeria').click();
+$('in-galeria').onchange = (e) => {
+  const fs = [...e.target.files];
+  $('elegidas').innerHTML = fs.length
+    ? `<b>${fs.length} foto(s)</b><ul>${fs.map((f) => `<li>${f.name} · ${new Date(f.lastModified).toLocaleDateString('es')}</li>`).join('')}</ul>`
+    : 'sin elegir';
+};
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
+</script>
+</body>
+</html>
