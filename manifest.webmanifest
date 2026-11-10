@@ -1,8 +1,9 @@
 {
+  "id": "/prueba-compartir/",
   "name": "Prueba compartir",
   "short_name": "Prueba",
   "lang": "es",
-  "start_url": "./",
+  "start_url": "./?i=2",
   "scope": "./",
   "display": "standalone",
   "background_color": "#b45309",
